@@ -1,0 +1,17 @@
+# render.yaml
+services:
+  - type: web
+    name: stock-flow-web
+    env: docker
+    plan: free
+    previewEnvironmentsEnabled: true
+    envVars:
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: stock-flow-db
+          property: connectionString
+
+databases:
+  - name: stock-flow-db
+    plan: free
+    previewEnvironmentsEnabled: true
