@@ -1,0 +1,66 @@
+@page "/account/login"
+@using System.ComponentModel.DataAnnotations
+@inject SignInManager<IdentityUser> SignInManager
+@inject UserManager<IdentityUser> UserManager
+@inject NavigationManager Navigation
+
+<h2 class="display-5">Welcome to StockFlow!</h2>
+<p class="lead">Please login to continue.</p>
+<EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="loginForm" style="max-width: 350px;">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <InputText @bind-Value="Input.Email" class="form-control" autocomplete="email" />
+        <ValidationMessage For="() => Input.Email" class="text-danger" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Password</label>
+        <InputText @bind-Value="Input.Password" type="password" class="form-control" autocomplete="current-password" />
+        <ValidationMessage For="() => Input.Password" class="text-danger" />
+    </div>
+    <button type="submit" class="btn btn-success">Login</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3">@errorMessage</div>
+}
+
+@code {
+    [SupplyParameterFromForm(FormName = "loginForm")]
+    public InputModel Input { get; set; } = new();
+    private string? errorMessage;
+
+    private async Task LoginUser()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(Input.Email) || string.IsNullOrWhiteSpace(Input.Password))
+        {
+            errorMessage = "Please provide both email and password.";
+            return;
+        }
+
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, isPersistent: false, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            errorMessage = "Email or password is incorrect.";
+        }
+    }
+
+    public class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}
