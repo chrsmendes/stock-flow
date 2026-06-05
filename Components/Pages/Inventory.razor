@@ -1,6 +1,6 @@
 @page "/inventory"
 @rendermode InteractiveServer
-@attribute [StreamRendering]
+@attribute [StreamRendering, Authorize]
 
 @inject IDbContextFactory<InventoryDbContext> DbFactory
 @inject NavigationManager NavigationManager
