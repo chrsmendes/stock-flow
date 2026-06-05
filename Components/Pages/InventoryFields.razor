@@ -1,0 +1,56 @@
+@using stock_flow.Models
+
+<div class="mb-3">
+    <label class="form-label">SKU</label>
+    <InputText class="form-control" @bind-Value="Model.SKU" disabled="@DisableSku" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Name</label>
+    <InputText class="form-control" @bind-Value="Model.Name" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Description</label>
+    <InputTextArea class="form-control" rows="3" @bind-Value="Model.Description" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Category</label>
+    <InputText class="form-control" @bind-Value="Model.Category" />
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-6">
+        <label class="form-label">Quantity on hand</label>
+        <InputNumber class="form-control" @bind-Value="Model.QuantityOnHand" />
+    </div>
+    <div class="col-sm-6">
+        <label class="form-label">Reorder point</label>
+        <InputNumber class="form-control" @bind-Value="Model.MinimumStockLevel" />
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-sm-6">
+        <label class="form-label">Unit cost</label>
+        <InputNumber class="form-control" @bind-Value="Model.UnitCost" />
+    </div>
+    <div class="col-sm-6">
+        <label class="form-label">Retail price</label>
+        <InputNumber class="form-control" @bind-Value="Model.RetailPrice" />
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Location</label>
+    <InputText class="form-control" @bind-Value="Model.PhysicalLocation" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public InventoryItem Model { get; set; } = default!;
+
+    [Parameter]
+    public bool DisableSku { get; set; }
+}

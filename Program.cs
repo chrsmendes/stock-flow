@@ -57,13 +57,17 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddDbContextFactory<InventoryDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("InventoryDb") ?? "Data Source=stock-flow.db"));
+
 var app = builder.Build();
 
-// Automatically apply database migrations when the Render container starts
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    db.Database.Migrate();
+    var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<InventoryDbContext>>();
+    await using var db = await factory.CreateDbContextAsync();
+    await db.Database.EnsureCreatedAsync();
+    await InventorySeedData.EnsureSeededAsync(db);
 }
 
 // Configure the HTTP request pipeline.

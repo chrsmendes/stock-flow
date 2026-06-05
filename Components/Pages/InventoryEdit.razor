@@ -1,0 +1,77 @@
+@page "/inventory/edit/{Sku}"
+@rendermode InteractiveServer
+@attribute [StreamRendering]
+
+@inject IDbContextFactory<InventoryDbContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Inventory Item</PageTitle>
+
+<div class="mb-4">
+    <h1 class="mb-1">Edit Inventory Item</h1>
+    <p class="text-body-secondary mb-0">Update the existing stock record for @Sku.</p>
+</div>
+
+@if (item is null)
+{
+    <div class="alert alert-warning">Item not found.</div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <EditForm FormName="InventoryEditForm" Model="item" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <InventoryFields Model="item" DisableSku="true" />
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="submit">Save changes</button>
+                    <a class="btn btn-outline-secondary" href="/inventory">Cancel</a>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Sku { get; set; } = string.Empty;
+
+    private InventoryItem? item;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        item = await db.InventoryItems.FindAsync(Sku);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var trackedItem = await db.InventoryItems.FindAsync(Sku);
+        if (trackedItem is null)
+        {
+            return;
+        }
+
+        trackedItem.Name = item.Name;
+        trackedItem.Description = item.Description;
+        trackedItem.Category = item.Category;
+        trackedItem.QuantityOnHand = item.QuantityOnHand;
+        trackedItem.MinimumStockLevel = item.MinimumStockLevel;
+        trackedItem.UnitCost = item.UnitCost;
+        trackedItem.RetailPrice = item.RetailPrice;
+        trackedItem.PhysicalLocation = item.PhysicalLocation;
+        trackedItem.LastUpdated = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+        NavigationManager.NavigateTo("/inventory");
+    }
+}
