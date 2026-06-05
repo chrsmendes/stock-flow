@@ -1,0 +1,70 @@
+@page "/account/register"
+@using System.ComponentModel.DataAnnotations
+@inject UserManager<IdentityUser> UserManager
+@inject SignInManager<IdentityUser> SignInManager
+@inject NavigationManager Navigation
+
+<h2 class="display-5">Register a New Account</h2>
+<p class="lead">Please fill out the form below to create a new account.</p>
+
+<EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="registerForm" style="max-width: 350px;">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <InputText @bind-Value="Input.Email" class="form-control" autocomplete="email" />
+        <ValidationMessage For="() => Input.Email" class="text-danger" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Password</label>
+        <InputText @bind-Value="Input.Password" type="password" class="form-control" autocomplete="new-password" />
+        <ValidationMessage For="() => Input.Password" class="text-danger" />
+    </div>
+    <button type="submit" class="btn btn-primary">Register</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3">@errorMessage</div>
+}
+
+@code {
+    [SupplyParameterFromForm(FormName = "registerForm")]
+    public InputModel Input { get; set; } = new();
+
+    private string? errorMessage;
+
+    private async Task RegisterUser()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(Input.Email) || string.IsNullOrWhiteSpace(Input.Password))
+        {
+            errorMessage = "O e-mail e a senha não foram recebidos pelo servidor.";
+            return;
+        }
+
+        var user = new IdentityUser { UserName = Input.Email, Email = Input.Email };
+        var result = await UserManager.CreateAsync(user, Input.Password);
+
+        if (result.Succeeded)
+        {
+            await SignInManager.SignInAsync(user, isPersistent: false);
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+        }
+    }
+
+    public class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}
