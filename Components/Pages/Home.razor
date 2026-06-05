@@ -1,7 +1,104 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@attribute [StreamRendering]
+
+@inject IDbContextFactory<InventoryDbContext> DbFactory
 
 <PageTitle>Home</PageTitle>
 
-<h1>Stock Flow</h1>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+        <h1>Stock Flow</h1>
+    </div>
+    <a class="btn btn-outline-primary" href="/">Refresh</a>
+</div>
 
-This is intended to make your life easier as a storehouse! You can manage all your products in a single app.
+<p>This is intended to make your life easier as a storehouse! You can manage all your products in a single app.</p>
+
+ <div class="col-12 col-xl-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+                <strong>Current Stock</strong>
+                <span class="badge text-bg-secondary">@items.Count items</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>SKU</th>
+                            <th>Name</th>
+                            <th>Qty</th>
+                            <th>Cost</th>
+                            <th>Price</th>
+                            <th>Location</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (items.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-body-secondary py-4">No inventory records yet.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in items)
+                            {
+                                <tr>
+                                    <td>@item.SKU</td>
+                                    <td>
+                                        <div class="fw-semibold">@item.Name</div>
+                                        <div class="small text-body-secondary">@item.Category</div>
+                                    </td>
+                                    <td>@item.QuantityOnHand</td>
+                                    <td>@item.UnitCost.ToString("C")</td>
+                                    <td>@item.RetailPrice.ToString("C")</td>
+                                    <td>@item.PhysicalLocation</td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a class="btn btn-outline-primary" href="/inventory/edit/@item.SKU">Edit</a>
+                                            <button class="btn btn-outline-danger" @onclick="() => DeleteItemAsync(item.SKU)">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+
+@code {
+    private List<InventoryItem> items = new List<InventoryItem>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItemsAsync();
+    }
+
+    private async Task LoadItemsAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        items = await db.InventoryItems
+            .OrderBy(item => item.Name)
+            .ToListAsync();
+    }
+
+    private async Task DeleteItemAsync(string sku)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var item = await db.InventoryItems.FindAsync(sku);
+        if (item is null)
+        {
+            return;
+        }
+
+        db.InventoryItems.Remove(item);
+        await db.SaveChangesAsync();
+
+        items.RemoveAll(existing => existing.SKU == sku);
+    }
+}
