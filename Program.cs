@@ -6,17 +6,11 @@ using stock_flow.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-/*
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db";
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString));
-*/
-
-// With this smart block (Local SQLite vs Render PostgreSQL):
+// Smart block (Local SQLite vs Render PostgreSQL):
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
 
-if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
+if (!string.IsNullOrEmpty(connectionString) && (connectionString.StartsWith("postgres://") || connectionString.StartsWith("postgresql://")))
 {
     // Convert Render's Postgres URL format to EF Core's ADO.NET format
     var uri = new Uri(connectionString);
@@ -25,12 +19,19 @@ if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("post
 
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseNpgsql(npgsqlConnectionString));
+    
+    builder.Services.AddDbContextFactory<InventoryDbContext>(options =>
+        options.UseNpgsql(npgsqlConnectionString));
 }
 else
 {
-    // Fallback for local development (SQLite)
+    // Fallback local (SQLite)
+    var localDb = "Data Source=stock-flow.db";
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlite(connectionString ?? "Data Source=app.db"));
+        options.UseSqlite(localDb));
+        
+    builder.Services.AddDbContextFactory<InventoryDbContext>(options =>
+        options.UseSqlite(localDb));
 }
 
 builder.Services.AddAuthentication(options =>
@@ -57,16 +58,16 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddDbContextFactory<InventoryDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("InventoryDb") ?? "Data Source=stock-flow.db"));
-
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
+    var authDb = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await authDb.Database.MigrateAsync();
+
     var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<InventoryDbContext>>();
     await using var db = await factory.CreateDbContextAsync();
-    await db.Database.EnsureCreatedAsync();
+    await db.Database.MigrateAsync();
     await InventorySeedData.EnsureSeededAsync(db);
 }
 
@@ -78,7 +79,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAntiforgery();
 
