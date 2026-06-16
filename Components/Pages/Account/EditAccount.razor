@@ -1,0 +1,116 @@
+@page "/account/edit/{userId}"
+@using Microsoft.AspNetCore.Identity
+@using System.ComponentModel.DataAnnotations
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject UserManager<IdentityUser> UserManager
+@inject NavigationManager Navigation
+
+<h2 class="display-5">
+    <span class="bi bi-pencil-fill me-2"></span>Edit Account
+</h2>
+<p class="lead">Update the details for this user account.</p>
+
+<div class="mb-4">
+    <a href="/account">
+        Back to Account Manager
+    </a>
+</div>
+
+<EditForm Model="Input" method="post" OnValidSubmit="UpdateUser" FormName="editAccountForm" style="max-width: 350px;">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <InputText @bind-Value="Input.Email" class="form-control" autocomplete="email" />
+        <ValidationMessage For="() => Input.Email" class="text-danger" />
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Password (leave blank to keep current)</label>
+        <InputText @bind-Value="Input.Password" type="password" class="form-control" autocomplete="new-password" />
+        <ValidationMessage For="() => Input.Password" class="text-danger" />
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Update Account</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3">@errorMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success mt-3">@successMessage</div>
+}
+
+@code {
+    [Parameter] public string UserId { get; set; } = string.Empty;
+    [SupplyParameterFromForm] public InputModel Input { get; set; } = new();
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await UserManager.FindByIdAsync(UserId);
+        if (user == null)
+        {
+            errorMessage = "User not found.";
+            return;
+        }
+        Input.Email = user.Email ?? string.Empty;
+    }
+
+    private async Task UpdateUser()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        var user = await UserManager.FindByIdAsync(UserId);
+        if (user == null)
+        {
+            errorMessage = "User not found.";
+            return;
+        }
+
+        user.Email = Input.Email;
+        user.UserName = Input.Email;
+
+        var result = await UserManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Input.Password))
+        {
+            var removePasswordResult = await UserManager.RemovePasswordAsync(user);
+            if (!removePasswordResult.Succeeded)
+            {
+                errorMessage = "Error removing old password.";
+                return;
+            }
+
+            var addPasswordResult = await UserManager.AddPasswordAsync(user, Input.Password);
+            if (!addPasswordResult.Succeeded)
+            {
+                errorMessage = string.Join(", ", addPasswordResult.Errors.Select(e => e.Description));
+                return;
+            }
+        }
+
+        successMessage = "Account updated successfully!";
+    }
+
+    public class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? Password { get; set; }
+    }
+}

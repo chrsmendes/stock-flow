@@ -1,0 +1,121 @@
+@page "/account"
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject UserManager<IdentityUser> UserManager
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h2 class="display-5">
+    Account Manager
+</h2>
+<p class="lead">Manage all user accounts in the system.</p>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>User List</h3>
+    <a href="/account/register" class="btn btn-primary">
+        Create New Account
+    </a>
+</div>
+
+@if (users == null)
+{
+    <p><em>Loading users...</em></p>
+}
+else if (!users.Any())
+{
+    <div class="alert alert-info">No users found.</div>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in users)
+            {
+                <tr>
+                    <td>@user.Email</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary me-2" @onclick="() => EditUser(user.Id)">
+                            <span class="bi bi-pencil"></span> Edit
+                        </button>
+                        @if (user.Id != currentUserId)
+                        {
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteUser(user.Id)">
+                                <span class="bi bi-trash"></span> Delete
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert @messageClass mt-3">@message</div>
+}
+
+@code {
+    private List<IdentityUser>? users;
+    private string? currentUserId;
+    private string? message;
+    private string messageClass = "alert-info";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUserId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        users = await UserManager.Users.ToListAsync();
+    }
+
+    private async Task DeleteUser(string userId)
+    {
+        var currentUserId = (await AuthStateProvider.GetAuthenticationStateAsync()).User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (userId == currentUserId)
+        {
+            message = "You cannot delete your own account.";
+            messageClass = "alert-danger";
+            StateHasChanged();
+            return;
+        }
+
+        var user = await UserManager.FindByIdAsync(userId);
+        if (user != null)
+        {
+            var result = await UserManager.DeleteAsync(user);
+            if (result.Succeeded)
+            {
+                message = "User deleted successfully.";
+                messageClass = "alert-success";
+                await LoadUsers();
+                StateHasChanged();
+            }
+            else
+            {
+                message = "Error deleting user.";
+                messageClass = "alert-danger";
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void EditUser(string userId)
+    {
+        Navigation.NavigateTo($"/account/edit/{userId}");
+    }
+}

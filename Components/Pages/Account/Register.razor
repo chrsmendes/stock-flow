@@ -1,11 +1,24 @@
 @page "/account/register"
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
 @inject UserManager<IdentityUser> UserManager
 @inject SignInManager<IdentityUser> SignInManager
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
 
-<h2 class="display-5">Register a New Account</h2>
+<h2 class="display-5">
+    <span class="bi bi-person-plus-fill me-2"></span>Register a New Account
+</h2>
 <p class="lead">Please fill out the form below to create a new account.</p>
+
+@if (isLoggedIn)
+{
+    <div class="mb-4">
+        <a href="/account/manage">
+            Back to Account Manager
+        </a>
+    </div>
+}
 
 <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="registerForm" style="max-width: 350px;">
     <DataAnnotationsValidator />
@@ -49,13 +62,30 @@
 
         if (result.Succeeded)
         {
-            await SignInManager.SignInAsync(user, isPersistent: false);
-            Navigation.NavigateTo("/", forceLoad: true);
+            if (isLoggedIn)
+            {
+                // If the user was already logged in, redirect them to the account manager
+                Navigation.NavigateTo("/account");
+            }
+            else
+            {
+                await SignInManager.SignInAsync(user, isPersistent: false);
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
         }
         else
         {
             errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
         }
+    }
+
+    private bool isLoggedIn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        isLoggedIn = user.Identity?.IsAuthenticated ?? false;
     }
 
     public class InputModel
