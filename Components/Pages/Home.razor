@@ -11,35 +11,88 @@
     <div>
         <h1>Stock Flow</h1>
     </div>
-    <a class="btn btn-outline-primary" href="/">Refresh</a>
+    <button class="btn btn-outline-primary" type="button" @onclick="ReloadAsync">Refresh</button>
 </div>
 
 <p>This is intended to make your life easier as a storehouse! You can manage all your products in a single app.</p>
 
- <div class="col-12 col-xl-7">
+<div class="row g-4">
+    <div class="col-12 col-xl-3">
         <div class="card shadow-sm">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+            <div class="card-header bg-white">
+                <strong>Filters</strong>
+            </div>
+            <div class="card-body d-grid gap-3">
+                <div>
+                    <label class="form-label" for="searchTerm">Search</label>
+                    <input id="searchTerm" class="form-control" placeholder="SKU, name, category, location" value="@searchTerm" @onchange="HandleSearchChanged" />
+                </div>
+
+                <div>
+                    <label class="form-label" for="categoryFilter">Category</label>
+                    <select id="categoryFilter" class="form-select" value="@selectedCategory" @onchange="HandleCategoryChanged">
+                        <option value="">All categories</option>
+                        @foreach (var category in categories)
+                        {
+                            <option value="@category">@category</option>
+                        }
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label" for="pageSize">Rows per page</label>
+                    <select id="pageSize" class="form-select" value="@pageSize" @onchange="HandlePageSizeChanged">
+                        @foreach (var size in pageSizeOptions)
+                        {
+                            <option value="@size">@size</option>
+                        }
+                    </select>
+                </div>
+
+                <button class="btn btn-outline-secondary" type="button" @onclick="ClearFiltersAsync">Clear filters</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-9">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <strong>Current Stock</strong>
-                <span class="badge text-bg-secondary">@items.Count items</span>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge text-bg-secondary">@totalItems items</span>
+                    <span class="text-body-secondary small">Page @currentPage of @totalPages</span>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>SKU</th>
-                            <th>Name</th>
-                            <th>Qty</th>
-                            <th>Cost</th>
-                            <th>Price</th>
-                            <th>Location</th>
-                            <th></th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold @GetSortClass(nameof(InventoryItem.SKU))" @onclick="() => SortByAsync(nameof(InventoryItem.SKU))">SKU @GetSortIndicator(nameof(InventoryItem.SKU))</button>
+                            </th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold @GetSortClass(nameof(InventoryItem.Name))" @onclick="() => SortByAsync(nameof(InventoryItem.Name))">Name @GetSortIndicator(nameof(InventoryItem.Name))</button>
+                            </th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold @GetSortClass(nameof(InventoryItem.QuantityOnHand))" @onclick="() => SortByAsync(nameof(InventoryItem.QuantityOnHand))">Qty @GetSortIndicator(nameof(InventoryItem.QuantityOnHand))</button>
+                            </th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold @GetSortClass(nameof(InventoryItem.UnitCost))" @onclick="() => SortByAsync(nameof(InventoryItem.UnitCost))">Cost @GetSortIndicator(nameof(InventoryItem.UnitCost))</button>
+                            </th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold @GetSortClass(nameof(InventoryItem.RetailPrice))" @onclick="() => SortByAsync(nameof(InventoryItem.RetailPrice))">Price @GetSortIndicator(nameof(InventoryItem.RetailPrice))</button>
+                            </th>
+                            <th scope="col">
+                                <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold @GetSortClass(nameof(InventoryItem.PhysicalLocation))" @onclick="() => SortByAsync(nameof(InventoryItem.PhysicalLocation))">Location @GetSortIndicator(nameof(InventoryItem.PhysicalLocation))</button>
+                            </th>
+                            <th scope="col"></th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (items.Count == 0)
                         {
                             <tr>
-                                <td colspan="7" class="text-center text-body-secondary py-4">No inventory records yet.</td>
+                                <td colspan="7" class="text-center text-body-secondary py-4">No inventory records match the current filters.</td>
                             </tr>
                         }
                         else
@@ -68,24 +121,192 @@
                     </tbody>
                 </table>
             </div>
+
+            <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="text-body-secondary small">
+                    Showing @displayStart - @displayEnd of @totalItems
+                </div>
+
+                <nav aria-label="Inventory pagination">
+                    <ul class="pagination mb-0">
+                        <li class="page-item @(currentPage == 1 ? "disabled" : string.Empty)">
+                            <button class="page-link" type="button" @onclick="PreviousPageAsync" disabled="@(currentPage == 1)">Previous</button>
+                        </li>
+                        @for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+                        {
+                            var targetPage = pageNumber;
+                            <li class="page-item @(pageNumber == currentPage ? "active" : string.Empty)">
+                                <button class="page-link" type="button" @onclick="() => GoToPageAsync(targetPage)">@pageNumber</button>
+                            </li>
+                        }
+                        <li class="page-item @(currentPage == totalPages ? "disabled" : string.Empty)">
+                            <button class="page-link" type="button" @onclick="NextPageAsync" disabled="@(currentPage == totalPages)">Next</button>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
         </div>
     </div>
-
+</div>
 
 @code {
-    private List<InventoryItem> items = new List<InventoryItem>();
+    private readonly int[] pageSizeOptions = [5, 10, 20, 50];
+    private List<InventoryItem> items = [];
+    private List<string> categories = [];
+    private string searchTerm = string.Empty;
+    private string selectedCategory = string.Empty;
+    private string sortColumn = nameof(InventoryItem.Name);
+    private bool sortDescending;
+    private int pageSize = 10;
+    private int currentPage = 1;
+    private int totalItems;
+    private int totalPages = 1;
+    private int displayStart;
+    private int displayEnd;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadItemsAsync();
+        await LoadInventoryAsync();
     }
 
-    private async Task LoadItemsAsync()
+    private async Task LoadInventoryAsync()
     {
         await using var db = await DbFactory.CreateDbContextAsync();
-        items = await db.InventoryItems
-            .OrderBy(item => item.Name)
+
+        categories = await db.InventoryItems
+            .Where(item => item.Category != string.Empty)
+            .Select(item => item.Category)
+            .Distinct()
+            .OrderBy(category => category)
             .ToListAsync();
+
+        var query = BuildQuery(db);
+
+        totalItems = await query.CountAsync();
+        totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
+        currentPage = Math.Clamp(currentPage, 1, totalPages);
+
+        items = await query
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        displayStart = totalItems == 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+        displayEnd = totalItems == 0 ? 0 : Math.Min(currentPage * pageSize, totalItems);
+    }
+
+    private IQueryable<InventoryItem> BuildQuery(InventoryDbContext db)
+    {
+        var query = db.InventoryItems.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var normalizedSearch = searchTerm.Trim();
+            query = query.Where(item =>
+                item.SKU.Contains(normalizedSearch) ||
+                item.Name.Contains(normalizedSearch) ||
+                item.Category.Contains(normalizedSearch) ||
+                item.PhysicalLocation.Contains(normalizedSearch));
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedCategory))
+        {
+            query = query.Where(item => item.Category == selectedCategory);
+        }
+
+        query = sortColumn switch
+        {
+            nameof(InventoryItem.SKU) => sortDescending ? query.OrderByDescending(item => item.SKU) : query.OrderBy(item => item.SKU),
+            nameof(InventoryItem.Name) => sortDescending ? query.OrderByDescending(item => item.Name) : query.OrderBy(item => item.Name),
+            nameof(InventoryItem.QuantityOnHand) => sortDescending ? query.OrderByDescending(item => item.QuantityOnHand) : query.OrderBy(item => item.QuantityOnHand),
+            nameof(InventoryItem.UnitCost) => sortDescending ? query.OrderByDescending(item => item.UnitCost) : query.OrderBy(item => item.UnitCost),
+            nameof(InventoryItem.RetailPrice) => sortDescending ? query.OrderByDescending(item => item.RetailPrice) : query.OrderBy(item => item.RetailPrice),
+            nameof(InventoryItem.PhysicalLocation) => sortDescending ? query.OrderByDescending(item => item.PhysicalLocation) : query.OrderBy(item => item.PhysicalLocation),
+            _ => query.OrderBy(item => item.Name)
+        };
+
+        return query;
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadInventoryAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        searchTerm = string.Empty;
+        selectedCategory = string.Empty;
+        sortColumn = nameof(InventoryItem.Name);
+        sortDescending = false;
+        pageSize = 10;
+        currentPage = 1;
+        await LoadInventoryAsync();
+    }
+
+    private async Task HandleSearchChanged(ChangeEventArgs args)
+    {
+        searchTerm = args.Value?.ToString() ?? string.Empty;
+        currentPage = 1;
+        await LoadInventoryAsync();
+    }
+
+    private async Task HandleCategoryChanged(ChangeEventArgs args)
+    {
+        selectedCategory = args.Value?.ToString() ?? string.Empty;
+        currentPage = 1;
+        await LoadInventoryAsync();
+    }
+
+    private async Task HandlePageSizeChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var selectedPageSize) && selectedPageSize > 0)
+        {
+            pageSize = selectedPageSize;
+        }
+
+        currentPage = 1;
+        await LoadInventoryAsync();
+    }
+
+    private async Task SortByAsync(string column)
+    {
+        if (sortColumn == column)
+        {
+            sortDescending = !sortDescending;
+        }
+        else
+        {
+            sortColumn = column;
+            sortDescending = false;
+        }
+
+        currentPage = 1;
+        await LoadInventoryAsync();
+    }
+
+    private async Task GoToPageAsync(int pageNumber)
+    {
+        currentPage = Math.Clamp(pageNumber, 1, totalPages);
+        await LoadInventoryAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        if (currentPage > 1)
+        {
+            currentPage--;
+            await LoadInventoryAsync();
+        }
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (currentPage < totalPages)
+        {
+            currentPage++;
+            await LoadInventoryAsync();
+        }
     }
 
     private async Task DeleteItemAsync(string sku)
@@ -100,6 +321,21 @@
         db.InventoryItems.Remove(item);
         await db.SaveChangesAsync();
 
-        items.RemoveAll(existing => existing.SKU == sku);
+        await LoadInventoryAsync();
+    }
+
+    private string GetSortClass(string column)
+    {
+        return sortColumn == column ? "text-primary" : "text-body-secondary";
+    }
+
+    private string GetSortIndicator(string column)
+    {
+        if (sortColumn != column)
+        {
+            return string.Empty;
+        }
+
+        return sortDescending ? "v" : "^";
     }
 }
